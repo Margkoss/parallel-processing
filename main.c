@@ -3,7 +3,6 @@
 #include <string.h>
 
 // User libs
-// #include "stack.h"
 
 // Linked list definition
 typedef struct node
@@ -18,11 +17,12 @@ const int STEP_SIZE = 100;
 char **loadFile(char *filename, int *len);
 int **generateAdjMatrix(char **matrixLines, int *len);
 
-// Linked list stack functions
+// Linked list queue functions
 node_t *create();
-void push(int data, node_t **head);
+void enqueue(int data, node_t **head);
 void print_list(node_t *head);
-int pop(node_t **head);
+int dequeue(node_t **head);
+int isEmpty(node_t *head);
 
 int main(int argc, char *argv[])
 {
@@ -72,8 +72,14 @@ int main(int argc, char *argv[])
             }
         }
 
-    // Place all nodes with no incoming edge on to a stack
-    node_t *stack = create();
+    /*
+    *   Begin Kahn's algorithm
+    */
+
+    // Place all nodes with no incoming edge on to a queue
+    node_t *toCheck = create();
+    node_t *sorted = create();
+
     // Incoming edges are represented by ones in columns (ref -> https://en.wikipedia.org/wiki/Adjacency_matrix#Directed_graphs)
     for (int j = 0; j < size; j++)
     {
@@ -87,8 +93,40 @@ int main(int argc, char *argv[])
             }
         }
         if (!foundOne)
-            push(j, &stack);
+            enqueue(j, &toCheck);
     }
+
+    // Dequeue elements and look if they have incoming edges
+    while (!isEmpty(toCheck))
+    {
+        int vertex = dequeue(&toCheck);
+        enqueue(vertex, &sorted);
+        node_t *neigboors = create();
+        for (int i = 0; i < size; i++)
+        {
+            if (dag[vertex][i])
+            {
+                enqueue(i, &neigboors);
+                dag[vertex][i] = 0;
+            }
+        }
+        while (!isEmpty(neigboors))
+        {
+            int single = dequeue(&neigboors);
+            int foundOne = 0;
+            for (int i = 0; i < size; i++)
+            {
+                if (dag[i][single])
+                {
+                    foundOne++;
+                    break;
+                }
+            }
+            if (!foundOne)
+                enqueue(single, &toCheck);
+        }
+    }
+    print_list(sorted);
 
     return 0;
 }
@@ -196,13 +234,13 @@ char **loadFile(char *filename, int *len)
     return lines;
 }
 
-// empty linked list stack
+// empty linked list queue
 node_t *create()
 {
     return NULL;
 }
 
-void push(int data, node_t **head)
+void enqueue(int data, node_t **head)
 {
     if (!(*head))
     {
@@ -225,6 +263,7 @@ void push(int data, node_t **head)
     }
 }
 
+// Debugging function that traverses linked list and prints elements
 void print_list(node_t *head)
 {
     if (!head)
@@ -238,28 +277,34 @@ void print_list(node_t *head)
 
         while (current != NULL)
         {
-            printf("%d ", current->data);
+            printf("%d \n", current->data);
             current = current->next;
         }
         printf("\n");
     }
 }
 
-int pop(node_t **head)
+int dequeue(node_t **head)
 {
     if (!(*head))
     {
-        return 0;
+        return -1;
     }
     else
     {
         node_t *temp;
+        int toPop = (*head)->data;
 
         temp = (*head);
         (*head) = (*head)->next;
         temp->next = NULL;
 
         free(temp);
-        return 1;
+        return toPop;
     }
+}
+
+int isEmpty(node_t *head)
+{
+    return head == NULL;
 }
