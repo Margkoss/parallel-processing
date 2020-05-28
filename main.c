@@ -3,13 +3,26 @@
 #include <string.h>
 
 // User libs
-#include "stack.h"
+// #include "stack.h"
+
+// Linked list definition
+typedef struct node
+{
+    int data;
+    struct node *next;
+} node_t;
 
 const char *RED = "\033[0;31m";
 const int STEP_SIZE = 100;
 
 char **loadFile(char *filename, int *len);
-int **generateAdjMatrix(char **matrixLines, int len);
+int **generateAdjMatrix(char **matrixLines, int *len);
+
+// Linked list stack functions
+node_t *create();
+void push(int data, node_t **head);
+void print_list(node_t *head);
+int pop(node_t **head);
 
 int main(int argc, char *argv[])
 {
@@ -27,17 +40,60 @@ int main(int argc, char *argv[])
     char **words = loadFile(argv[1], &length);
 
     // Create an adjacency matrix to represent the DAG
-    int **dag = generateAdjMatrix(words, length);
+    int size;
+    int **dag = generateAdjMatrix(words, &size);
 
     // Words array isn't needed so free memory
     for (int i = 0; i < length; i++)
         free(words[i]);
     free(words);
 
+    // Check that there is nothing on the main diagonal because that would mean self-loops
+    for (int i = 0; i < size; i++)
+    {
+        if (dag[i][i])
+        {
+            fprintf(stderr, "%sExitting...\nThe graph given is not a DAG because of self loop in (%d, %d)\n", RED, ++i, i);
+            exit(1);
+        }
+    }
+
+    // Check that there is no symmetry that would mean loops
+    for (int i = 0; i < size; i++)
+        for (int j = 0; j < size; j++)
+        {
+            if (i == j)
+                continue;
+
+            if (dag[i][j] == 1 && dag[j][i] == 1)
+            {
+                fprintf(stderr, "%sExitting...\nThe graph given is not a DAG because cyclic dependency [%d, %d]\n", RED, ++i, ++j);
+                exit(1);
+            }
+        }
+
+    // Place all nodes with no incoming edge on to a stack
+    node_t *stack = create();
+    // Incoming edges are represented by ones in columns (ref -> https://en.wikipedia.org/wiki/Adjacency_matrix#Directed_graphs)
+    for (int j = 0; j < size; j++)
+    {
+        int foundOne = 0;
+        for (int i = 0; i < size; i++)
+        {
+            if (dag[i][j])
+            {
+                foundOne++;
+                break;
+            }
+        }
+        if (!foundOne)
+            push(j, &stack);
+    }
+
     return 0;
 }
 
-int **generateAdjMatrix(char **matrixLines, int len)
+int **generateAdjMatrix(char **matrixLines, int *len)
 {
     char *firstLine = malloc(strlen(matrixLines[0]) + 1);
     strcpy(firstLine, matrixLines[0]);
@@ -54,7 +110,7 @@ int **generateAdjMatrix(char **matrixLines, int len)
     sscanf(edgesString, "%d", &edges);
 
     // Create 2d empty 2d array from size
-    int **arr = malloc(size * sizeof(int *));
+    int **arr = calloc(size, sizeof(int *));
     // Throw error in chance of failure to create array in memory
     if (!arr)
     {
@@ -64,7 +120,7 @@ int **generateAdjMatrix(char **matrixLines, int len)
 
     for (int i = 0; i < size; i++)
     {
-        arr[i] = malloc(size * sizeof(int));
+        arr[i] = calloc(size, sizeof(int));
         // Throw error in chance of failure to create array in memory
         if (!arr[i])
         {
@@ -85,6 +141,7 @@ int **generateAdjMatrix(char **matrixLines, int len)
         arr[first - 1][second - 1] = 1;
     }
 
+    *len = size;
     return arr;
 }
 
@@ -137,4 +194,72 @@ char **loadFile(char *filename, int *len)
 
     *len = i;
     return lines;
+}
+
+// empty linked list stack
+node_t *create()
+{
+    return NULL;
+}
+
+void push(int data, node_t **head)
+{
+    if (!(*head))
+    {
+        (*head) = (struct node *)malloc(1 * sizeof(struct node));
+        (*head)->next = NULL;
+        (*head)->data = data;
+    }
+    else
+    {
+        node_t *current = (*head);
+        while (current->next != NULL)
+        {
+            current = current->next;
+        }
+
+        /* now we can add a new variable */
+        current->next = (node_t *)malloc(sizeof(node_t));
+        current->next->data = data;
+        current->next->next = NULL;
+    }
+}
+
+void print_list(node_t *head)
+{
+    if (!head)
+    {
+        printf("No items yet\n");
+    }
+    else
+    {
+
+        node_t *current = head;
+
+        while (current != NULL)
+        {
+            printf("%d ", current->data);
+            current = current->next;
+        }
+        printf("\n");
+    }
+}
+
+int pop(node_t **head)
+{
+    if (!(*head))
+    {
+        return 0;
+    }
+    else
+    {
+        node_t *temp;
+
+        temp = (*head);
+        (*head) = (*head)->next;
+        temp->next = NULL;
+
+        free(temp);
+        return 1;
+    }
 }
